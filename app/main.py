@@ -2,17 +2,21 @@ from fastapi import FastAPI
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.database import AsyncSessionLocal
-
+from app.database.dependencies import get_db
 from fastapi import Depends
-
+from app.routers import company
 
 app = FastAPI()
 
+app.include_router(
+    company.router,
+    prefix="/api/company",
+    tags=["Company"],
+)
 
 @app.get("/health")
 async def health(
-    db: AsyncSession = Depends(AsyncSessionLocal),
+    db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(text("SELECT 1"))
 
