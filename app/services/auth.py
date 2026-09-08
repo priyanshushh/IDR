@@ -95,29 +95,46 @@ class AuthService:
             "company_id": str(company.id),
             "role": "owner",
         }
+    async def signin(self, email: str, password: str):
+        result = await self.db.execute(
+            select(User).where(User.email == email)
+        )
 
-    async def signin(self, payload: CompanyLoginSchema):
-        result = await self.db.execute(select(User).where(User.email == payload.email))
         user = result.scalars().first()
 
-        # Same message for "no such user" and "wrong password" so a caller can't use
-        # this endpoint to enumerate which emails have accounts.
-        if not user or not verify_password(payload.password, user.hashed_password):
-            raise HTTPException(status_code=401, detail="Invalid email or password")
+        if not user or not verify_password(
+            password,
+            user.hashed_password
+        ):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid email or password",
+            )
 
         if not user.is_active:
-            raise HTTPException(status_code=403, detail="This account has been deactivated")
+            raise HTTPException(
+                status_code=403,
+                detail="This account has been deactivated",
+            )
 
         result = await self.db.execute(
-            select(CompanyMember).where(CompanyMember.user_id == user.id)
+            select(CompanyMember).where(
+                CompanyMember.user_id == user.id
+            )
         )
         company_member = result.scalars().first()
 
         if not company_member or company_member.status != "active":
-            raise HTTPException(status_code=403, detail="No active company membership")
+            raise HTTPException(
+                status_code=403,
+                detail="No active company membership",
+            )
 
         try:
-            raw_refresh_token, refresh_token_row = self._issue_refresh_token(user.id)
+            raw_refresh_token, refresh_token_row = self._issue_refresh_token(
+                user.id
+            )
+
             self.db.add(refresh_token_row)
             await self.db.commit()
         except Exception:
@@ -138,6 +155,7 @@ class AuthService:
             "company_id": str(company_member.company_id),
             "role": company_member.role,
         }
+
 
     async def refresh(self, raw_refresh_token: str):
       
@@ -241,3 +259,5 @@ class AuthService:
             "company_id": str(company_member.company_id),
             "role": company_member.role,
         }
+    async def logout(self, currentuser):
+        pass
