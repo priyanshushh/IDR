@@ -8,10 +8,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     # Application
     app_name: str = "InDepthRag"
-    debug: bool = True
-
     # Database
     database_url: str
+
+
+    access_token_expire_minutes: int = 60
+    secret_key:str
+    algorithm:str = "HS256"
+    debug: bool = True
+    refresh_token_expire_days: int = 30
+
 
     # Future RAG settings
     # embedding_model: str = "default"

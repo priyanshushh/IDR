@@ -16,6 +16,7 @@ class Company(Base):
         index=True
     )
     name: Mapped[str] = mapped_column(String(255))
+    domain: Mapped[str] = mapped_column(String(255), unique=True,index=True)
     slug: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     plan: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
@@ -43,7 +44,7 @@ class CompanyMember(Base):
     company_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("company.id"))
     role: Mapped[str] = mapped_column(String(255)) # ('owner' | 'admin' | 'member')
     status: Mapped[str] = mapped_column(String(255)) #('invited' | 'active' | 'deactivated')
-    invited_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    invited_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     joined_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
 
 
@@ -53,12 +54,33 @@ class RefreshToken(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
-        unique=True,
-        default=uuid.uuid4(),
+        default=uuid.uuid4,
         index=True
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
-    token_hash: Mapped[str] = mapped_column(String(255))
-    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    revoked: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    token_hash: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False
+    )
+
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False
+    )
+
+    revoked: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=func.now(),
+        nullable=False
+    )

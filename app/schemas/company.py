@@ -1,6 +1,18 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 import uuid
+
+class CompanySignupSchema(BaseModel):
+    email:str
+    password:str
+    owner_name:str
+    company_name:str
+    plan:str
+
+class CompanyLoginSchema(BaseModel):
+    email:str
+    password:str
+
 class CompanyCreateSchema(BaseModel):
     name:str
     plan:str
