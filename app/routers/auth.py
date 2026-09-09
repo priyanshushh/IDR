@@ -1,6 +1,7 @@
 from fastapi import APIRouter,FastAPI,Depends
 from app.services.auth import AuthService
-from app.schemas.company import CompanySignupSchema
+from app.schemas.company import CompanySignupSchema, RefreshTokenSchema
+from app.schemas.user import UserProfileSchema
 from app.database.dependencies import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Annotated
@@ -38,7 +39,7 @@ async def refresh(
     service = AuthService(db)
     return await service.refresh(raw_refresh_token)
 
-@router.get("/me")
+@router.get("/me",response_model=UserProfileSchema)
 async def me(
     currentuser: CurrentUser
 ):
@@ -46,8 +47,9 @@ async def me(
 
 @router.post("/logout")
 async def logout(
+    payload: RefreshTokenSchema,
     currentuser: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
     service = AuthService(db)
-    return await service.logout(currentuser)
+    return await service.logout(currentuser, payload.refresh_token)

@@ -259,5 +259,35 @@ class AuthService:
             "company_id": str(company_member.company_id),
             "role": company_member.role,
         }
-    async def logout(self, currentuser):
-        pass
+
+    async def logout(self, user: User, raw_refresh_token: str):
+        token_hash = hashlib.sha256(raw_refresh_token.encode()).hexdigest()
+
+        result = await self.db.execute(
+            select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+        )
+        refresh_token = result.scalars().first()
+
+        # Checking user_id here (not just "does this hash exist") stops one user from
+        # revoking a session that isn't theirs, even if they somehow got hold of
+        # someone else's raw refresh token string.
+        if not refresh_token or str(refresh_token.user_id) != str(user.id):
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+        refresh_token.revoked = True
+        await self.db.commit()
+
+        return {"detail": "Logged out successfully"}
+        
+    async def logout(self, currentuser,raw_refresh_token):
+        result = await self.db.execute(
+            select(RefreshToken).where(
+                RefreshToken.token_hash == hashlib.sha256(raw_refresh_token.encode()).hexdigest()
+            )
+        )
+        refresh_token = result.scalars().first()
+        if not refresh_token or str(refresh_token.user_id) != str(currentuser.id):
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+        refresh_token.revoked = True
+        await self.db.commit()
+        return {"detail": "Logged out successfully"}

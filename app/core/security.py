@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import Depends
 from fastapi import HTTPException
+from app.schemas.user import UserProfileSchema
+from app.models.company import CompanyMember
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/signin")
 
@@ -59,7 +61,7 @@ def decode_refresh_token(token:str):
 async def get_current_user(
     db: Annotated[AsyncSession, Depends(get_db)],
     token: Annotated[str, Depends(oauth2_scheme)],
-):
+)->UserProfileSchema:
     payload = decode_access_token(token)
 
     if not payload:
@@ -80,15 +82,34 @@ async def get_current_user(
         select(User).where(User.id == user_id)
     )
 
-    user = result.scalars().first()
 
+    user = result.scalars().first()
+    member_result = await db.execute(
+        select(CompanyMember).where(CompanyMember.user_id == user_id)
+    )
+    member = member_result.scalars().first()
+
+    
+    final_user = UserProfileSchema(
+        id=user.id,
+        name=user.name,
+        must_change_password=user.must_change_password,
+        email=user.email,
+        is_active=user.is_active,
+        created_at=user.created_at,
+        last_login_at=user.last_login_at,
+        company_id=member.company_id,
+        role=member.role,
+        status=member.status
+    )
+    
     if not user or not user.is_active:
         raise HTTPException(
             status_code=401,
             detail="Invalid authentication credentials",
         )
 
-    return user
+    return final_user
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
