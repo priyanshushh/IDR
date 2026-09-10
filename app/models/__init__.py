@@ -1,6 +1,7 @@
 from app.models.user import User
 from app.models.company import Company,CompanyMember,RefreshToken
 from app.models.groups import Group,GroupMember
+from app.models.documents import Document,DocumentPermission
 
 __all__ = [
     "User",
@@ -8,5 +9,7 @@ __all__ = [
     "CompanyMember",
     "RefreshToken",
     "Group",
-    "GroupMember"
+    "GroupMember",
+    "Document",
+    "DocumentPermission"
 ]
