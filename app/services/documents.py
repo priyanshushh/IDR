@@ -1,5 +1,7 @@
 from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.models.documents import Document,DocumentPermission
 from app.storage.interface import StorageBackend
@@ -75,3 +77,44 @@ class DocumentService:
                 await self.storage.delete(storage_key)
 
             raise
+
+    async def list_documents(self, company_id):
+        stmt = (
+            select(Document)
+            .where(Document.company_id == company_id)
+            .options(selectinload(Document.permissions))
+        )
+
+        result = await self.db.execute(stmt)
+
+        return result.scalars().all()
+
+    async def get_document(self, company_id,document_id):
+        stmt = (
+            select(Document)
+            .where(Document.company_id == company_id)
+            .where(Document.id == document_id)
+            .options(selectinload(Document.permissions))
+        )
+
+        result = await self.db.execute(stmt)
+
+        return result.scalars().first()
+
+    async def delete_document(self, company_id,document_id):
+        stmt = (
+            select(Document)
+            .where(Document.company_id == company_id)
+            .where(Document.id == document_id)
+            .options(selectinload(Document.permissions))
+        )
+
+        result = await self.db.execute(stmt)
+        document = result.scalars().first()
+        if document is None:
+            raise HTTPException(status_code=404, detail="Document not found")
+        if document.storage_key:
+            await self.storage.delete(document.storage_key)
+        await self.db.delete(document)
+        await self.db.commit()
+        return {"message": "Document deleted successfully"}

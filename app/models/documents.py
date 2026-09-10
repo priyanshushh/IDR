@@ -1,5 +1,5 @@
 from sqlalchemy import String, Boolean, DateTime, ForeignKey, BigInteger
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column,relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.database.database import Base
 from sqlalchemy import Text
@@ -88,6 +88,12 @@ class Document(Base):
         default=True,
         nullable=False,
     )
+    permissions = relationship(
+        "DocumentPermission",
+        back_populates="document",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
 
 class DocumentPermission(Base):
@@ -131,5 +137,7 @@ class DocumentPermission(Base):
         default=func.now(),
         nullable=False,
     )
-
-    
+    document = relationship(
+        "Document",
+        back_populates="permissions",
+    )

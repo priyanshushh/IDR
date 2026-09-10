@@ -1,6 +1,3 @@
-# Storage: write uploaded files to a local folder (e.g. ./storage/{company_id}/{document_id}/filename) behind a small 
-#StorageBackend interface with one method each for save/read/delete. Keeping that interface
-# thin now is what makes swapping in S3 at Stage 11 a config change instead of a rewrite.
 from fastapi import (
     APIRouter,
     Depends,
@@ -46,3 +43,28 @@ async def upload_document(
         document_category=document_category,
         visibility=visibility,
     )
+
+@router.get("/")
+async def list_documents(
+    currentuser: CurrentUser,
+    service: DocumentService = Depends(get_document_service),
+):
+    return await service.list_documents(company_id=currentuser.company_id)
+
+
+@router.get("/{id}")
+async def get_document(
+    id: str,
+    currentuser: CurrentUser,
+    service: DocumentService = Depends(get_document_service),
+):
+    return await service.get_document(company_id=currentuser.company_id, document_id=id)
+
+
+@router.delete("/{id}")
+async def delete_document(
+    id: str,
+    currentuser: CurrentUser,
+    service: DocumentService = Depends(get_document_service),
+):
+    return await service.delete_document(company_id=currentuser.company_id, document_id=id)
