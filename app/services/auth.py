@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+import uuid
 from datetime import datetime, timedelta
 
 from fastapi import HTTPException
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.email_domains import extract_domain, is_banned_email_domain
 from app.core.security import create_access_token, create_refresh_token, hash_password, verify_password, decode_refresh_token
+from app.database.tenant_provisioning import provision_tenant_schema
 from app.models.company import Company, CompanyMember, RefreshToken
 from app.models.user import User
 from app.schemas.company import CompanyLoginSchema, CompanySignupSchema
@@ -52,15 +54,30 @@ class AuthService:
             self.db.add(user)
             await self.db.flush()
 
+            # id is generated client-side (not left to the DB default) so
+            # schema_name can be computed and set *before* this row is ever
+            # inserted — schema_name is NOT NULL at the DB level, so the insert
+            # itself would fail if we tried to flush first and backfill it after
+            # (as an earlier version of this code did).
+            company_id = uuid.uuid4()
+            schema_name = f"tenant_{company_id.hex}"
+
             company = Company(
+                id=company_id,
                 name=payload.company_name,
                 domain=domain,
                 slug=payload.company_name.replace(" ", "-").lower(),
                 plan=payload.plan,
+                schema_name=schema_name,
                 is_active=True,
             )
             self.db.add(company)
             await self.db.flush()
+
+            # Provisioning (CREATE SCHEMA + the four tenant tables) runs on this
+            # same session/transaction, so it commits or rolls back atomically
+            # with the company/user/member rows below — see
+            # app/database/tenant_provisioning.py.
 
             self.db.add(CompanyMember(
                 user_id=user.id,
@@ -72,6 +89,9 @@ class AuthService:
 
             raw_refresh_token, refresh_token_row = self._issue_refresh_token(user.id)
             self.db.add(refresh_token_row)
+
+            await self.db.flush()
+            await provision_tenant_schema(self.db, schema_name)
 
             await self.db.commit()
         except IntegrityError:
@@ -85,6 +105,7 @@ class AuthService:
             "user_id": str(user.id),
             "company_id": str(company.id),
             "role": "owner",
+            "schema_name": schema_name,
         })
 
         return {
@@ -118,11 +139,14 @@ class AuthService:
             )
 
         result = await self.db.execute(
-            select(CompanyMember).where(
+            select(CompanyMember, Company.schema_name).join(
+                Company, Company.id == CompanyMember.company_id
+            ).where(
                 CompanyMember.user_id == user.id
             )
         )
-        company_member = result.scalars().first()
+        row = result.first()
+        company_member, schema_name = row if row else (None, None)
 
         if not company_member or company_member.status != "active":
             raise HTTPException(
@@ -145,6 +169,7 @@ class AuthService:
             "user_id": str(user.id),
             "company_id": str(company_member.company_id),
             "role": company_member.role,
+            "schema_name": schema_name,
         })
 
         return {
@@ -218,13 +243,16 @@ class AuthService:
 
     
         result = await self.db.execute(
-            select(CompanyMember).where(
+            select(CompanyMember, Company.schema_name).join(
+                Company, Company.id == CompanyMember.company_id
+            ).where(
                 CompanyMember.user_id == refresh_token.user_id,
                 CompanyMember.status == "active",
             )
         )
 
-        company_member = result.scalars().first()
+        row = result.first()
+        company_member, schema_name = row if row else (None, None)
 
         if not company_member:
             raise HTTPException(
@@ -232,9 +260,9 @@ class AuthService:
                 detail="No active company membership",
             )
 
-      
+
         # Rotate refresh token
-        
+
         refresh_token.revoked = True
 
         new_raw_refresh_token, new_refresh_token_row = (
@@ -248,6 +276,7 @@ class AuthService:
             "user_id": str(refresh_token.user_id),
             "company_id": str(company_member.company_id),
             "role": company_member.role,
+            "schema_name": schema_name,
         })
 
         await self.db.commit()

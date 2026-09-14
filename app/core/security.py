@@ -78,6 +78,14 @@ async def get_current_user(
             detail="Invalid token",
         )
 
+    schema_name = payload.get("schema_name")
+
+    if not schema_name:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid token",
+        )
+
     result = await db.execute(
         select(User).where(User.id == user_id)
     )
@@ -89,7 +97,7 @@ async def get_current_user(
     )
     member = member_result.scalars().first()
 
-    
+
     final_user = UserProfileSchema(
         id=user.id,
         name=user.name,
@@ -100,7 +108,8 @@ async def get_current_user(
         last_login_at=user.last_login_at,
         company_id=member.company_id,
         role=member.role,
-        status=member.status
+        status=member.status,
+        schema_name=schema_name,
     )
     
     if not user or not user.is_active:

@@ -12,7 +12,7 @@ class User(Base):
         UUID(as_uuid=True),
         primary_key=True,
         unique=True,
-        default=uuid.uuid4(),
+        default=uuid.uuid4,
         index=True
     )
     name:Mapped[str] = mapped_column(

@@ -8,9 +8,9 @@ from fastapi import (
 
 from app.core.security import CurrentUser
 from app.core.storage import get_storage
+from app.core.tenant_db import get_tenant_db
 from app.services.documents import DocumentService
 from app.storage.interface import StorageBackend
-from app.database.dependencies import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.documents import DocumentVisibility
 
@@ -19,7 +19,7 @@ router = APIRouter()
 
 def get_document_service(
     storage: StorageBackend = Depends(get_storage),
-    db: AsyncSession=Depends(get_db)
+    db: AsyncSession=Depends(get_tenant_db)
 ) -> DocumentService:
     return DocumentService(db,storage)
 

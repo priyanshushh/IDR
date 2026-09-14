@@ -39,7 +39,7 @@ async def refresh(
     service = AuthService(db)
     return await service.refresh(raw_refresh_token)
 
-@router.get("/me",response_model=UserProfileSchema)
+@router.get("/me",response_model=UserProfileSchema,response_model_exclude={"schema_name"})
 async def me(
     currentuser: CurrentUser
 ):

@@ -1,7 +1,7 @@
 from sqlalchemy import String, Boolean, DateTime, ForeignKey, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column,relationship
 from sqlalchemy.dialects.postgresql import UUID
-from app.database.database import Base
+from app.database.database import Base, TENANT_SCHEMA
 from sqlalchemy import Text
 
 import uuid
@@ -11,6 +11,7 @@ from sqlalchemy import func
 
 class Document(Base):
     __tablename__ = "documents"
+    __table_args__ = {"schema": TENANT_SCHEMA}
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -19,16 +20,19 @@ class Document(Base):
         index=True,
     )
 
+    # No FK to company.id — this table lives in a per-tenant schema, so the
+    # schema itself is the tenant boundary; company_id is kept only as a
+    # denormalized defense-in-depth column (build_docs/02-architecture.md §2.5).
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("company.id"),
         nullable=False,
         index=True,
     )
 
+    # No FK to users.id — users is global/public, this table is per-tenant;
+    # see the company_id note above for the cross-schema-FK trade-off.
     uploaded_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id"),
         nullable=False,
     )
 
@@ -98,6 +102,7 @@ class Document(Base):
 
 class DocumentPermission(Base):
     __tablename__ = "document_permissions"
+    __table_args__ = {"schema": TENANT_SCHEMA}
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -106,28 +111,31 @@ class DocumentPermission(Base):
         index=True,
     )
 
+    # documents.id and groups.id are in the same tenant schema, so these two
+    # FKs stay real constraints — schema_translate_map resolves both sides
+    # consistently at execution time.
     document_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("documents.id"),
+        ForeignKey(f"{TENANT_SCHEMA}.documents.id"),
         nullable=False,
         index=True,
     )
 
     group_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("groups.id"),
+        ForeignKey(f"{TENANT_SCHEMA}.groups.id"),
         nullable=True,
         index=True,
     )
+    # No FK to users.id/company.id — both are global/public tables; see the
+    # cross-schema-FK note on Document.company_id above.
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id"),
         nullable=True,
         index=True,
     )
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("company.id"),
         nullable=False,
         index=True,
     )

@@ -1,16 +1,16 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import CurrentUser
+from app.core.tenant_db import get_tenant_db
 from app.services.groups import GroupService
-from app.database.dependencies import get_db
-from app.schemas.groups import GroupCreateRequest, GroupResponse, GroupUpdateRequest, GroupMembersRequest, GroupPermissionsRequest,GroupMembersResponse 
+from app.schemas.groups import GroupCreateRequest, GroupResponse, GroupUpdateRequest, GroupMembersRequest, GroupPermissionsRequest,GroupMembersResponse
 import uuid
 
 router = APIRouter()
 
 
 def get_group_service(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ) -> GroupService:
     return GroupService(db)
 

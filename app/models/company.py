@@ -12,13 +12,22 @@ class Company(Base):
         UUID(as_uuid=True),
         primary_key=True,
         unique=True,
-        default=uuid.uuid4(),
+        default=uuid.uuid4,
         index=True
     )
     name: Mapped[str] = mapped_column(String(255))
     domain: Mapped[str] = mapped_column(String(255), unique=True,index=True)
     slug: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     plan: Mapped[str] = mapped_column(String(255))
+    # The Postgres schema holding this company's tenant-scoped tables
+    # (documents, groups, group_members, document_permissions) — always
+    # "tenant_<id.hex>", set once at signup and never changed. Nullable at the
+    # DB level only to allow a one-time backfill for rows that pre-date schema
+    # -per-tenant; every row created through AuthService.signup_company sets it
+    # immediately. See build_docs/06-schema-per-tenant-migration.md.
+    schema_name: Mapped[str | None] = mapped_column(
+        String(63), unique=True, index=True, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=func.now(),
@@ -37,7 +46,7 @@ class CompanyMember(Base):
         UUID(as_uuid=True),
         primary_key=True,
         unique=True,
-        default=uuid.uuid4(),
+        default=uuid.uuid4,
         index=True
     )
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
