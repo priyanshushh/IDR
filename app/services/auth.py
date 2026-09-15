@@ -21,14 +21,16 @@ class AuthService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    def _issue_refresh_token(self, user_id) -> tuple[str, RefreshToken]:
+    def _issue_refresh_token(self, user_id,schema_name:str) -> tuple[str, RefreshToken]:
         raw_token = create_refresh_token({
             "user_id": str(user_id),
             "jti": secrets.token_urlsafe(16),
+            "schema_name": schema_name,
         })
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
         row = RefreshToken(
             user_id=user_id,
+            schema_name=schema_name,
             token_hash=token_hash,
             expires_at=datetime.utcnow() + timedelta(days=settings.refresh_token_expire_days),
             revoked=False,
@@ -87,7 +89,7 @@ class AuthService:
                 invited_by=None,
             ))
 
-            raw_refresh_token, refresh_token_row = self._issue_refresh_token(user.id)
+            raw_refresh_token, refresh_token_row = self._issue_refresh_token(user.id,schema_name)
             self.db.add(refresh_token_row)
 
             await self.db.flush()
