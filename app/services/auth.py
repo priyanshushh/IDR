@@ -310,15 +310,3 @@ class AuthService:
 
         return {"detail": "Logged out successfully"}
         
-    async def logout(self, currentuser,raw_refresh_token):
-        result = await self.db.execute(
-            select(RefreshToken).where(
-                RefreshToken.token_hash == hashlib.sha256(raw_refresh_token.encode()).hexdigest()
-            )
-        )
-        refresh_token = result.scalars().first()
-        if not refresh_token or str(refresh_token.user_id) != str(currentuser.id):
-            raise HTTPException(status_code=401, detail="Invalid refresh token")
-        refresh_token.revoked = True
-        await self.db.commit()
-        return {"detail": "Logged out successfully"}
