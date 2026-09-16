@@ -3,7 +3,7 @@ from sqlalchemy.orm import Mapped, mapped_column,relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.database.database import Base, TENANT_SCHEMA
 from sqlalchemy import Text
-
+from pgvector.sqlalchemy import Vector
 import uuid
 from datetime import datetime
 from sqlalchemy import func
@@ -81,6 +81,15 @@ class Document(Base):
         default="company_wide",
     )
 
+    # Tracks the async extract -> chunk -> embed pipeline (build_docs
+    # 08-pgvector-migration-guide.md Part 5): pending right after upload,
+    # processing while the background job runs, then ready/failed.
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="pending",
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=func.now(),
@@ -148,4 +157,48 @@ class DocumentPermission(Base):
     document = relationship(
         "Document",
         back_populates="permissions",
+    )
+
+
+
+
+class DocumentChunks(Base):
+    __tablename__ = "document_chunks"
+    __table_args__ = {"schema": TENANT_SCHEMA}
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        index=True,
+    )
+
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(f"{TENANT_SCHEMA}.documents.id"),
+        nullable=False,
+        index=True,
+    )
+
+    company_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=False,
+        index=True,
+    )
+    chunk_index: Mapped[int] = mapped_column(nullable=False)
+
+    content: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    embedding: Mapped[Vector] = mapped_column(
+        Vector(384),
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=func.now(),
+        nullable=False,
     )

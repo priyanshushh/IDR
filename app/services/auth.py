@@ -30,7 +30,6 @@ class AuthService:
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
         row = RefreshToken(
             user_id=user_id,
-            schema_name=schema_name,
             token_hash=token_hash,
             expires_at=datetime.utcnow() + timedelta(days=settings.refresh_token_expire_days),
             revoked=False,
@@ -158,7 +157,8 @@ class AuthService:
 
         try:
             raw_refresh_token, refresh_token_row = self._issue_refresh_token(
-                user.id
+                user.id,
+                schema_name,
             )
 
             self.db.add(refresh_token_row)
