@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 from app.models.documents import Document,DocumentPermission
 from app.storage.interface import StorageBackend
 from app.schemas.documents import DocumentVisibility
-
+from app.services.ingestion import PDFProcessor
 class DocumentService:
 
     def __init__(
@@ -64,7 +64,9 @@ class DocumentService:
             )
 
             document.storage_key = storage_key
-
+            processor = PDFProcessor(storage_key,self.db,document)
+            await processor.process_document()
+            
             await self.db.commit()
             await self.db.refresh(document)
 
