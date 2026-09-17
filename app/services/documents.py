@@ -1,4 +1,4 @@
-from fastapi import UploadFile
+from fastapi import UploadFile, BackgroundTasks, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -26,6 +26,7 @@ class DocumentService:
     document_type: str,
     document_category: str,
     visibility: DocumentVisibility,
+    background_tasks: BackgroundTasks,
 ):
         document = Document(
             company_id=company_id,
@@ -65,7 +66,9 @@ class DocumentService:
 
             document.storage_key = storage_key
             processor = PDFProcessor(storage_key,self.db,document)
-            await processor.process_document()
+            
+            background_tasks.add_task(processor.process_document)
+
             
             await self.db.commit()
             await self.db.refresh(document)

@@ -5,7 +5,7 @@ from fastapi import (
     Form,
     UploadFile,
 )
-
+from fastapi import BackgroundTasks
 from app.core.security import CurrentUser
 from app.core.storage import get_storage
 from app.core.tenant_db import get_tenant_db
@@ -26,6 +26,7 @@ def get_document_service(
 
 @router.post("/upload")
 async def upload_document(
+    background_tasks: BackgroundTasks,
     currentuser: CurrentUser,
     file: UploadFile = File(...),
     document_name: str = Form(...),
@@ -42,6 +43,7 @@ async def upload_document(
         document_type=document_type,
         document_category=document_category,
         visibility=visibility,
+        background_tasks=background_tasks
     )
 
 @router.get("/")
