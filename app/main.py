@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.dependencies import get_db
 from fastapi import Depends
-from app.routers import company , auth, employee, documents, groups
+from app.routers import company , auth, employee, documents, groups, chat
 
 app = FastAPI()
 
@@ -13,6 +13,7 @@ app.include_router(company.router, prefix="/api/company", tags=["Company"])
 app.include_router(employee.router, prefix="/api/employees", tags=["Employees"])
 app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
 app.include_router(groups.router, prefix="/api/groups", tags=["Groups"])
+app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
 
 @app.get("/health")
 async def health(

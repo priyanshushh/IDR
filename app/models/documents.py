@@ -175,7 +175,7 @@ class DocumentChunks(Base):
 
     document_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey(f"{TENANT_SCHEMA}.documents.id"),
+        ForeignKey(f"{TENANT_SCHEMA}.documents.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

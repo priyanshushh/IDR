@@ -51,7 +51,7 @@ async def list_documents(
     currentuser: CurrentUser,
     service: DocumentService = Depends(get_document_service),
 ):
-    return await service.list_documents(company_id=currentuser.company_id)
+    return await service.list_documents(company_id=currentuser.company_id,user_id=currentuser.id)
 
 
 @router.get("/{id}")
@@ -60,7 +60,9 @@ async def get_document(
     currentuser: CurrentUser,
     service: DocumentService = Depends(get_document_service),
 ):
-    return await service.get_document(company_id=currentuser.company_id, document_id=id)
+    return await service.get_document(
+        company_id=currentuser.company_id, document_id=id, user_id=currentuser.id
+    )
 
 
 @router.delete("/{id}")
