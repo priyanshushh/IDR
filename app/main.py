@@ -29,3 +29,5 @@ async def health(
 
 
 # uv run uvicorn app.main:app --reload
+# uv run alembic -c alembic_tenant.ini -x schema=tenant_fbe796f4f300442d854f659264394981 revision --autogenerate -m "update document chunks table to add metadata"
+# uv run alembic -c alembic_tenant.ini upgrade head

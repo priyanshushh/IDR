@@ -1,12 +1,13 @@
-from sqlalchemy import String, Boolean, DateTime, ForeignKey, BigInteger
+from sqlalchemy import String, Boolean, DateTime, ForeignKey, BigInteger, Any
 from sqlalchemy.orm import Mapped, mapped_column,relationship
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.database.database import Base, TENANT_SCHEMA
 from sqlalchemy import Text
 from pgvector.sqlalchemy import Vector
 import uuid
 from datetime import datetime
 from sqlalchemy import func
+from typing import Any
 
 
 class Document(Base):
@@ -201,4 +202,14 @@ class DocumentChunks(Base):
         DateTime,
         default=func.now(),
         nullable=False,
+    )
+
+    # Python attribute avoids the name `metadata` — that's reserved on SQLAlchemy's
+    # declarative Base (Base.metadata is the MetaData registry) — but the actual
+    # Postgres column is still named "metadata", matching the migration.
+    meta_data: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB,
+        nullable=False,
+        default=dict,
     )

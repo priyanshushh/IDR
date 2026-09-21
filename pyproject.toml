@@ -31,6 +31,8 @@ dependencies = [
     "sentence-transformers>=6.0.1",
     "sqlalchemy>=2.0.52",
     "torch>=2.14.0",
+    "unstructured-inference>=1.6.13",
+    "unstructured[all-docs]>=0.27.6",
     "uvicorn[standard]>=0.52.4",
 ]
 

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.documents import DocumentChunks, Document
 from sqlalchemy import delete
 
-class PDFProcessor:
+class DocumentProcessor:
     def __init__(self, file_path: str, db: AsyncSession,document:Document) -> None:
         self.file_path = Path("./uploads") / file_path
         self.db = db

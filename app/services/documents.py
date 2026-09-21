@@ -9,7 +9,7 @@ from app.models.documents import Document,DocumentPermission
 from app.models.groups import GroupMember
 from app.storage.interface import StorageBackend
 from app.schemas.documents import DocumentVisibility
-from app.services.ingestion import PDFProcessor
+from app.services.ingestion import DocumentProcessor
 from app.services.permissions import resolve_accessible_document_ids
 
 
@@ -71,7 +71,7 @@ class DocumentService:
             )
 
             document.storage_key = storage_key
-            processor = PDFProcessor(storage_key,self.db,document)
+            processor = DocumentProcessor(storage_key,self.db,document)
             
             background_tasks.add_task(processor.process_document)
 
