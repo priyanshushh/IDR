@@ -1,11 +1,17 @@
 import asyncio
 from pathlib import Path
 
+from unstructured.partition.auto import partition
+from unstructured.chunking.title import chunk_by_title
+from unstructured.documents.elements import Element
+
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document as LCDocument
+
 from app.services.embeddings import embed_texts
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.documents import DocumentChunks, Document
 from sqlalchemy import delete
 
@@ -15,23 +21,34 @@ class DocumentProcessor:
         self.db = db
         self.document = document
 
-    async def extract_text_from_pdf(self) -> list[LCDocument]:
-
-        loader = PyPDFLoader(file_path=self.file_path)
-        pages = await loader.aload()
-
-        return pages
-
-    async def chunk_text(self, text: list[LCDocument]) -> list[LCDocument]:
-
-        splitter = RecursiveCharacterTextSplitter(
-            separators=["\n\n", "\n", ".", " "],
-            chunk_size=500,
-            chunk_overlap=25,
+    async def extract_elements(self) -> list[Element]:
+        # partition()'s filename arg has to be a plain str — python-magic's ctypes
+        # binding (used internally for file-type detection) can't marshal a Path
+        # object and raises deep inside: `ctypes.ArgumentError: argument 2: TypeError:
+        # wrong type`.
+        #
+        # strategy="hi_res" runs the layout detection model instead of just pulling
+        # raw text, and skip_infer_table_types=[] makes it actually recognize Table
+        # elements (default strategy is "auto", which falls back to "fast" for
+        # text-based PDFs and never detects tables at all).
+        return await asyncio.to_thread(
+            partition,
+            filename=str(self.file_path),
+            strategy="hi_res",
+            skip_infer_table_types=[],
         )
 
-        chunks = await asyncio.to_thread(splitter.split_documents, text)
-        return chunks
+
+    async def chunk_elements(self,elements: list[Element])->list:
+        return await asyncio.to_thread(
+            chunk_by_title,
+            elements,
+            max_characters=800,
+            combine_text_under_n_chars=200,
+            new_after_n_chars=700,
+        )
+        
+    
 
     async def process_document(self):
         try:
@@ -40,16 +57,16 @@ class DocumentProcessor:
 
             print("STATUS CHANGED TO PROCESSING")
 
-            text = await self.extract_text_from_pdf()
+            elements = await self.extract_elements()
+            
+            print("ELEMENTS EXTRACTED---------------------------------------------",elements)
 
-            print("TEXT EXTRACTED")
-
-            chunks = await self.chunk_text(text)
+            chunks = await self.chunk_elements(elements)
 
             print(f"CHUNKS CREATED: {len(chunks)}")
 
             embeddings = await asyncio.to_thread(embed_texts,
-                [chunk.page_content for chunk in chunks]
+                [chunk.text for chunk in chunks]
             )
 
             print("EMBEDDINGS CREATED")
@@ -67,9 +84,13 @@ class DocumentProcessor:
                     DocumentChunks(
                         document_id=self.document.id,
                         chunk_index=index,
-                        content=chunk.page_content,
+                        content=chunk.text,
                         embedding=embedding,
                         company_id=self.document.company_id,
+                        meta_data={
+                            "category": type(chunk).__name__,
+                            "page_number": chunk.metadata.page_number
+                        }
                     )
                 )
 

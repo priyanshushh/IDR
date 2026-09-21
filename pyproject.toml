@@ -27,12 +27,12 @@ dependencies = [
     "pyjwt>=2.13.0",
     "pypdf>=6.19.0",
     "python-dotenv>=1.2.3",
+    "python-magic-bin>=0.4.14",
     "python-multipart>=0.0.32",
     "sentence-transformers>=6.0.1",
     "sqlalchemy>=2.0.52",
     "torch>=2.14.0",
-    "unstructured-inference>=1.6.13",
-    "unstructured[all-docs]>=0.27.6",
+    "unstructured[docx,pdf,pptx,xlsx]>=0.27.6",
     "uvicorn[standard]>=0.52.4",
 ]
 
