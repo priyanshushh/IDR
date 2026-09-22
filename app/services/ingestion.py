@@ -1,13 +1,17 @@
 import asyncio
 from pathlib import Path
 
+import pymupdf
+
 from unstructured.partition.auto import partition
 from unstructured.chunking.title import chunk_by_title
-from unstructured.documents.elements import Element
-
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_core.documents import Document as LCDocument
+from unstructured.documents.elements import (
+    Element,
+    ElementMetadata,
+    Image,
+    NarrativeText,
+    Table,
+)
 
 from app.services.embeddings import embed_texts
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,21 +26,62 @@ class DocumentProcessor:
         self.document = document
 
     async def extract_elements(self) -> list[Element]:
-        # partition()'s filename arg has to be a plain str — python-magic's ctypes
-        # binding (used internally for file-type detection) can't marshal a Path
-        # object and raises deep inside: `ctypes.ArgumentError: argument 2: TypeError:
-        # wrong type`.
-        #
-        # strategy="hi_res" runs the layout detection model instead of just pulling
-        # raw text, and skip_infer_table_types=[] makes it actually recognize Table
-        # elements (default strategy is "auto", which falls back to "fast" for
-        # text-based PDFs and never detects tables at all).
-        return await asyncio.to_thread(
-            partition,
-            filename=str(self.file_path),
-            strategy="hi_res",
-            skip_infer_table_types=[],
-        )
+        # PDFs go through PyMuPDF instead of unstructured's partition_pdf: getting
+        # unstructured to recognize tables requires strategy="hi_res"
+        if self.file_path.suffix.lower() == ".pdf":
+            return await asyncio.to_thread(self._extract_pdf_elements)
+
+        return await asyncio.to_thread(partition, filename=str(self.file_path))
+
+    def _extract_pdf_elements(self) -> list[Element]:
+        elements: list[Element] = []
+        with pymupdf.open(str(self.file_path)) as doc:
+            for page_index, page in enumerate(doc):
+                elements.extend(
+                    self._extract_pdf_page_elements(page, page_index + 1)
+                )
+        return elements
+
+    def _extract_pdf_page_elements(self, page, page_number: int) -> list[Element]:
+       
+        items: list[tuple[float, Element]] = []
+
+        tables = page.find_tables()
+        table_bboxes = [pymupdf.Rect(table.bbox) for table in tables.tables]
+
+        for table in tables.tables:
+            markdown = table.to_markdown().strip()
+            if markdown:
+                items.append((
+                    table.bbox[1],
+                    Table(text=markdown, metadata=ElementMetadata(page_number=page_number)),
+                ))
+
+        for x0, y0, x1, y1, text, _, block_type in page.get_text("blocks"):
+            if block_type != 0:
+                continue 
+
+            text = text.strip()
+            if not text:
+                continue
+
+            block_rect = pymupdf.Rect(x0, y0, x1, y1)
+            if any(block_rect.intersects(bbox) for bbox in table_bboxes):
+                continue
+
+            items.append((
+                y0,
+                NarrativeText(text=text, metadata=ElementMetadata(page_number=page_number)),
+            ))
+
+        for image_info in page.get_image_info():
+            items.append((
+                image_info["bbox"][1],
+                Image(text="[Image]", metadata=ElementMetadata(page_number=page_number)),
+            ))
+
+        items.sort(key=lambda item: item[0])
+        return [element for _, element in items]
 
 
     async def chunk_elements(self,elements: list[Element])->list:
