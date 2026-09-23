@@ -4,7 +4,7 @@ from app.core.security import CurrentUser
 from app.core.tenant_db import get_tenant_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends
-from app.schemas.chat import ChatQueryRequest, ChatQueryResponse
+from app.schemas.chat import ChatQueryRequest, ChatQueryResponse, ChatSessionResponse , ChatMessageResponse
 
 router = APIRouter()
 
@@ -16,12 +16,49 @@ def get_chat_service(db: AsyncSession = Depends(get_tenant_db)) -> ChatService:
 
 @router.post("/query", response_model=ChatQueryResponse)
 async def query_endpoint(
+    session_id: str,
     request: ChatQueryRequest,
     current_user: CurrentUser,
     service: ChatService = Depends(get_chat_service),
 ):
     return await service.query(
+        session_id=session_id,
         question=request.query,
+        company_id=current_user.company_id,
+        user_id=current_user.id,
+    )
+
+@router.get("/sessions")
+async def list_sessions(
+    current_user: CurrentUser,
+    service: ChatService = Depends(get_chat_service),
+    response_model=list[ChatSessionResponse],
+):
+    return await service.list_sessions(
+        company_id=current_user.company_id,
+        user_id=current_user.id,
+    )
+
+@router.get("/sessions/{session_id}/messages",response_model=list[ChatMessageResponse])
+async def list_messages(
+    session_id: str,
+    current_user: CurrentUser,
+    service: ChatService = Depends(get_chat_service),
+):
+    return await service.list_messages(
+        session_id=session_id,
+        company_id=current_user.company_id,
+        user_id=current_user.id,
+    )
+
+@router.delete("/sessions/{session_id}",response_model=ChatSessionResponse)
+async def delete_session(
+    session_id: str,
+    current_user: CurrentUser,
+    service: ChatService = Depends(get_chat_service),
+):
+    return await service.delete_session(
+        session_id=session_id,
         company_id=current_user.company_id,
         user_id=current_user.id,
     )

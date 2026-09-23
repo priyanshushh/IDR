@@ -12,7 +12,7 @@ from app.core.tenant_db import get_tenant_db
 from app.services.documents import DocumentService
 from app.storage.interface import StorageBackend
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.schemas.documents import DocumentVisibility
+from app.schemas.documents import DocumentVisibility,DocumentUploadResponse
 
 router = APIRouter()
 
@@ -24,7 +24,7 @@ def get_document_service(
     return DocumentService(db,storage)
 
 
-@router.post("/upload")
+@router.post("/upload",response_model=DocumentUploadResponse)
 async def upload_document(
     background_tasks: BackgroundTasks,
     currentuser: CurrentUser,

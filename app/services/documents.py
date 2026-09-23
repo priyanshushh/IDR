@@ -11,7 +11,7 @@ from app.storage.interface import StorageBackend
 from app.schemas.documents import DocumentVisibility
 from app.services.ingestion import DocumentProcessor
 from app.services.permissions import resolve_accessible_document_ids
-
+from app.models.chat import ChatSession
 
 class DocumentService:
 
@@ -75,11 +75,22 @@ class DocumentService:
             
             background_tasks.add_task(processor.process_document)
 
-            
+            new_chat_session=ChatSession(
+                user_id=uploaded_by,
+                company_id=company_id,
+                title=file.filename,
+                document_ids=[str(document.id)]
+            )
+            self.db.add(new_chat_session)
+
             await self.db.commit()
             await self.db.refresh(document)
+            await self.db.refresh(new_chat_session)
 
-            return document
+            return {
+                "document": document,
+                "session_id": str(new_chat_session.id),
+            }
 
         except Exception:
             await self.db.rollback()
