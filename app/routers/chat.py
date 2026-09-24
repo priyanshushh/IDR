@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, status
 from app.services.chat import ChatService
 from app.core.security import CurrentUser
 from app.core.tenant_db import get_tenant_db
@@ -28,18 +28,17 @@ async def query_endpoint(
         user_id=current_user.id,
     )
 
-@router.get("/sessions")
+@router.get("/sessions", response_model=list[ChatSessionResponse])
 async def list_sessions(
     current_user: CurrentUser,
     service: ChatService = Depends(get_chat_service),
-    response_model=list[ChatSessionResponse],
 ):
     return await service.list_sessions(
         company_id=current_user.company_id,
         user_id=current_user.id,
     )
 
-@router.get("/sessions/{session_id}/messages",response_model=list[ChatMessageResponse])
+@router.get("/sessions/{session_id}/messages", response_model=list[ChatMessageResponse])
 async def list_messages(
     session_id: str,
     current_user: CurrentUser,
@@ -51,7 +50,7 @@ async def list_messages(
         user_id=current_user.id,
     )
 
-@router.delete("/sessions/{session_id}",response_model=ChatSessionResponse)
+@router.delete("/sessions/{session_id}",status_code=status.HTTP_200_OK)
 async def delete_session(
     session_id: str,
     current_user: CurrentUser,

@@ -18,8 +18,15 @@ class ChatQueryResponse(BaseModel):
 
 class ChatSessionResponse(BaseModel):
     id: uuid.UUID
+    title:str
+    user_id: uuid.UUID
+    company_id:uuid.UUID
+    document_ids:list[str] | None
     created_at: datetime
-    updated_at: datetime
+
+    model_config = {
+        "from_attributes":True
+    }
 
 
 class ChatMessageResponse(BaseModel):
@@ -31,3 +38,7 @@ class ChatMessageResponse(BaseModel):
     session_id: uuid.UUID
     sources: list[dict] | None
     created_at: datetime
+
+    model_config = {
+        "from_attributes":True
+    }
