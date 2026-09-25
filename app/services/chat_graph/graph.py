@@ -27,8 +27,10 @@ def build_chart_graph(
     graph.add_node("retrieve_chunks", nodes["retrieve_chunks"])
     graph.add_node("generate_answer", nodes["generate_answer"])
     graph.add_node("no_context_response", nodes["no_context_response"])
-    
-    graph.add_edge(START, "resolve_permissions")
+    graph.add_node("load_history", nodes["load_history"])
+
+    graph.add_edge(START, "load_history")
+    graph.add_edge("load_history", "resolve_permissions")
     graph.add_edge("resolve_permissions", "embed_question")
     graph.add_edge("embed_question", "retrieve_chunks")
     graph.add_conditional_edges(

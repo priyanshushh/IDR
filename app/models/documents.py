@@ -108,6 +108,9 @@ class Document(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    model_config={
+        "from_attributes": True,
+    }
 
 
 class DocumentPermission(Base):
@@ -160,6 +163,9 @@ class DocumentPermission(Base):
         back_populates="permissions",
     )
 
+    model_config={
+        "from_attributes": True,
+    }
 
 
 
@@ -213,3 +219,6 @@ class DocumentChunks(Base):
         nullable=False,
         default=dict,
     )
+    model_config={
+        "from_attributes": True,
+    }

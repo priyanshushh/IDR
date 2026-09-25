@@ -12,7 +12,13 @@ from app.core.tenant_db import get_tenant_db
 from app.services.documents import DocumentService
 from app.storage.interface import StorageBackend
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.schemas.documents import DocumentVisibility,DocumentUploadResponse
+from app.schemas.documents import (
+    DocumentVisibility,
+    DocumentUploadResponse,
+    DocumentSchema,
+    DocumentVisibilityUpdateRequest,
+    DocumentUserPermissionsRequest,
+)
 
 router = APIRouter()
 
@@ -62,6 +68,36 @@ async def get_document(
 ):
     return await service.get_document(
         company_id=currentuser.company_id, document_id=id, user_id=currentuser.id
+    )
+
+
+@router.patch("/{document_id}/permissions", response_model=DocumentSchema)
+async def update_document_visibility(
+    document_id: str,
+    request: DocumentVisibilityUpdateRequest,
+    currentuser: CurrentUser,
+    service: DocumentService = Depends(get_document_service),
+):
+    return await service.update_visibility(
+        company_id=currentuser.company_id,
+        document_id=document_id,
+        visibility=request.visibility,
+        updated_by=currentuser.id,
+    )
+
+
+@router.patch("/{document_id}/user-permissions", response_model=DocumentSchema)
+async def update_document_user_permissions(
+    document_id: str,
+    request: DocumentUserPermissionsRequest,
+    currentuser: CurrentUser,
+    service: DocumentService = Depends(get_document_service),
+):
+    return await service.update_user_permissions(
+        company_id=currentuser.company_id,
+        document_id=document_id,
+        user_ids=request.user_ids,
+        updated_by=currentuser.id,
     )
 
 

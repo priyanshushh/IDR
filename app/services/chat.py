@@ -6,7 +6,7 @@ from app.services.chat_graph.graph import build_chart_graph
 from app.services.chat_graph.state import ChatState
 from app.models.chat import ChatMessage, ChatSession
 from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 import logging 
 
@@ -30,36 +30,63 @@ class ChatService:
                 detail="Question cannot be empty.",
             )
 
-        try:
-            result = await self.db.execute(
-                select(ChatSession).where(
-                    ChatSession.id == session_id,
-                    ChatSession.company_id == company_id,
-                    ChatSession.user_id == user_id,
-                )
+        # try:
+        result = await self.db.execute(
+            select(ChatSession).where(
+                ChatSession.id == session_id,
+                ChatSession.company_id == company_id,
+                ChatSession.user_id == user_id,
             )
+        )
 
-            session_data = result.scalar_one_or_none()
+        session_data = result.scalar_one_or_none()
 
-        except SQLAlchemyError:
-            logger.exception(
-                "Failed to fetch chat session. "
-                "session_id=%s company_id=%s user_id=%s",
-                session_id,
-                company_id,
-                user_id,
-            )
+        # except SQLAlchemyError:
+        #     logger.exception(
+        #         "Failed to fetch chat session. "
+        #         "session_id=%s company_id=%s user_id=%s",
+        #         session_id,
+        #         company_id,
+        #         user_id,
+        #     )
 
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to retrieve chat session.",
-            )
+        #     raise HTTPException(
+        #         status_code=500,
+        #         detail="Failed to retrieve chat session.",
+        #     )
 
         if session_data is None:
-            raise HTTPException(
-                status_code=404,
-                detail="Chat session not found.",
+            new_chat_session = ChatSession(
+                id=session_id,
+                user_id=user_id,
+                company_id=company_id,
+                title=question.strip(),
             )
+            try:
+                self.db.add(new_chat_session)
+                await self.db.commit()
+                await self.db.refresh(new_chat_session)
+
+            except IntegrityError:
+                await self.db.rollback()
+                raise HTTPException(
+                    status_code=409,
+                    detail="Session id is already in use.",
+                )
+
+            except SQLAlchemyError:
+                await self.db.rollback()
+                logger.exception(
+                    "Failed to create chat session. session_id=%s",
+                    session_id,
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to create chat session.",
+                )
+
+            session_id = new_chat_session.id
+            session_data = new_chat_session
 
         try:
             graph = build_chart_graph(self.db)
@@ -106,6 +133,7 @@ class ChatService:
                     question=question.strip(),
                     company_id=company_id,
                     user_id=user_id,
+                    session_id=session_id
                 )
             )
 
@@ -145,7 +173,6 @@ class ChatService:
 
         try:
             self.db.add(new_assistant_message)
-            session_data.title = question.strip()
 
             await self.db.commit()
 
@@ -177,8 +204,13 @@ class ChatService:
             )
             result = await self.db.execute(stmt)
             return result.scalars().all()
-        except Exception as e:
-            raise HTTPException(status_code=404, detail=str(e))
+        except SQLAlchemyError:
+            logger.exception(
+                "Failed to list chat sessions. company_id=%s user_id=%s",
+                company_id,
+                user_id,
+            )
+            raise HTTPException(status_code=500, detail="Failed to list chat sessions.")
 
 
     async def list_messages(self, session_id: str, company_id: uuid.UUID, user_id: uuid.UUID) -> list[ChatMessageResponse]:
@@ -192,23 +224,46 @@ class ChatService:
             )
             result = await self.db.execute(stmt)
             return result.scalars().all()
-        except Exception as e:
-            raise HTTPException(status_code=404, detail=str(e))
-
-
-    async def delete_session(self, session_id: str, company_id: uuid.UUID, user_id: uuid.UUID) -> ChatSessionResponse:
-        try:
-            stmt = (
-                select(ChatSession)
-                .where(ChatSession.id == session_id)
-                .where(ChatSession.company_id == company_id)
-                .where(ChatSession.user_id == user_id)
+        except SQLAlchemyError:
+            logger.exception(
+                "Failed to list chat messages. session_id=%s company_id=%s user_id=%s",
+                session_id,
+                company_id,
+                user_id,
             )
+            raise HTTPException(status_code=500, detail="Failed to list chat messages.")
+
+
+    async def delete_session(self, session_id: str, company_id: uuid.UUID, user_id: uuid.UUID) -> dict:
+        stmt = (
+            select(ChatSession)
+            .where(ChatSession.id == session_id)
+            .where(ChatSession.company_id == company_id)
+            .where(ChatSession.user_id == user_id)
+        )
+
+        try:
             result = await self.db.execute(stmt)
-            session = result.scalars().first()
-            if session:
-                await self.db.delete(session)
-                await self.db.commit()
-            return {"message":"Session deleted successfully"}
-        except:
+        except SQLAlchemyError:
+            logger.exception(
+                "Failed to fetch chat session for deletion. session_id=%s",
+                session_id,
+            )
+            raise HTTPException(status_code=500, detail="Failed to delete session.")
+
+        session = result.scalars().first()
+        if session is None:
             raise HTTPException(status_code=404, detail="Session not found")
+
+        try:
+            await self.db.delete(session)
+            await self.db.commit()
+        except SQLAlchemyError:
+            await self.db.rollback()
+            logger.exception(
+                "Failed to delete chat session. session_id=%s",
+                session_id,
+            )
+            raise HTTPException(status_code=500, detail="Failed to delete session.")
+
+        return {"message": "Session deleted successfully"}

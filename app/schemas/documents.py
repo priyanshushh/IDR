@@ -15,6 +15,14 @@ class DocumentStatus(str, Enum):
     FAILED = "failed"
 
 
+class DocumentPermissionSchema(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID | None
+    group_id: uuid.UUID | None
+
+    model_config = {"from_attributes": True}
+
+
 class DocumentSchema(BaseModel):
     id: uuid.UUID
     uploaded_by: uuid.UUID
@@ -31,10 +39,19 @@ class DocumentSchema(BaseModel):
     storage_key: str
     created_at: datetime
     source: str | None = None
-    permissions: list[str] | None = None
+    permissions: list[DocumentPermissionSchema] | None = None
+
+    model_config = {"from_attributes": True}
 
 
-    
 class DocumentUploadResponse(BaseModel):
     document: DocumentSchema
-    session_id: str
+    # session_id: str
+
+
+class DocumentVisibilityUpdateRequest(BaseModel):
+    visibility: DocumentVisibility
+
+
+class DocumentUserPermissionsRequest(BaseModel):
+    user_ids: list[uuid.UUID]
