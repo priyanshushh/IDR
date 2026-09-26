@@ -1,6 +1,6 @@
-from sqlalchemy import String, Boolean, DateTime, ForeignKey, BigInteger, Any
+from sqlalchemy import String, Boolean, DateTime, ForeignKey, BigInteger, Any, Computed
 from sqlalchemy.orm import Mapped, mapped_column,relationship
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID, JSONB, TSVECTOR
 from app.database.database import Base, TENANT_SCHEMA
 from sqlalchemy import Text
 from pgvector.sqlalchemy import Vector
@@ -208,6 +208,11 @@ class DocumentChunks(Base):
         DateTime,
         default=func.now(),
         nullable=False,
+    )
+    
+    content_tsv: Mapped[str] = mapped_column(
+        TSVECTOR,
+        Computed("to_tsvector('english', content)", persisted=True),
     )
 
     # Python attribute avoids the name `metadata` — that's reserved on SQLAlchemy's
