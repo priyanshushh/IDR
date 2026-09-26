@@ -2,17 +2,8 @@ from langgraph.graph import StateGraph,START,END
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.chat_graph.state import ChatState
-from app.services.chat_graph.nodes import make_nodes, SIMILARITY_THRESHOLD
+from app.services.chat_graph.nodes import make_nodes
 from langgraph.prebuilt import ToolNode, tools_condition
-
-# Retrival Thresholding
-def route_after_retrieval(state: ChatState) -> str:
-    if not state["retrieved_chunks"]:
-        return "no_context_response"
-    best_score = min(c["score"] for c in state["retrieved_chunks"])  
-    if best_score > SIMILARITY_THRESHOLD:
-        return "no_context_response"
-    return "generate_answer"
 
 
 def build_chart_graph(db: AsyncSession):

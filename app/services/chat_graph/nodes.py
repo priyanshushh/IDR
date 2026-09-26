@@ -11,8 +11,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from app.models.chat import ChatMessage
 from app.services.prompts.system_prompt import SYSTEM_PROMPT
 from langchain_community.tools import DuckDuckGoSearchResults
-from langchain_core.tools import tool
-from langchain_core.messages import SystemMessage,HumanMessage
+from langchain_core.messages import SystemMessage
 
 SIMILARITY_THRESHOLD = 0.8
 TOP_K = 8
@@ -82,6 +81,7 @@ def make_nodes(db: AsyncSession):
                 "score": distance,
             }
             for chunk, distance in result.all()
+            if distance <= SIMILARITY_THRESHOLD
         ]
         return {"retrieved_chunks": chunks}
         
@@ -115,10 +115,6 @@ def make_nodes(db: AsyncSession):
             history_text=history_text,
             context=context,
             question=state["question"],
-            web_context=state.get(
-                "web_context",
-                "(no internet search results yet)",
-            ),
         )
 
         messages = [
@@ -148,25 +144,6 @@ def make_nodes(db: AsyncSession):
 
         return result
 
-    async def no_context_response(state: ChatState) -> dict:
-        history_text = "\n".join(
-            f"{turn['role']}: {turn['content']}" for turn in state["conversation_history"]
-        )
-
-        prompt = SYSTEM_PROMPT.format(
-            history_text=history_text,
-            context="(no relevant company-document context was found)",
-            question=state["question"],
-            web_context=state["web_context"]
-        )
-
-        response = await llm_with_tools.ainvoke(prompt)
-
-        return {
-            "answer": response.content[0]["text"],
-            "sources": [],
-        }
-
     return {
         "tools": tools,
         "resolve_permissions": resolve_permissions,
@@ -174,5 +151,4 @@ def make_nodes(db: AsyncSession):
         "retrieve_chunks": retrieve_chunks,
         "load_history": load_history,
         "generate_answer": generate_answer,
-        "no_context_response": no_context_response,
     }

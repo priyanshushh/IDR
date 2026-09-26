@@ -89,12 +89,9 @@ Conversation History:
 Company Document Context:
 {context}
 
-Internet Search Results:
-{web_context}
-
 User Question:
 {question}
 
 """,
-input_variables=["history_text", "context", "question", "web_context"]
+input_variables=["history_text", "context", "question"]
 )
