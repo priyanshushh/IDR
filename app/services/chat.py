@@ -7,7 +7,7 @@ from app.services.chat_graph.state import ChatState
 from app.models.chat import ChatMessage, ChatSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-
+from langchain_core.messages import HumanMessage
 import logging 
 
 logger = logging.getLogger(__name__)
@@ -133,7 +133,13 @@ class ChatService:
                     question=question.strip(),
                     company_id=company_id,
                     user_id=user_id,
-                    session_id=session_id
+                    messages=[
+                        HumanMessage(content=question)
+                    ],
+                    session_id=session_id,
+                    conversation_history= [],
+                    retrieved_chunks= [],
+                    accessible_document_ids= [],
                 )
             )
 

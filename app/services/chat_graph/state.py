@@ -2,6 +2,12 @@ from typing import TypedDict
 import uuid
 from app.schemas.chat import MessageRole
 
+from typing import Annotated
+from langgraph.graph.message import add_messages
+from langchain_core.messages import AnyMessage
+from typing_extensions import TypedDict
+
+
 class RetrievedChunk(TypedDict):
     content: str
     document_id: uuid.UUID
@@ -17,15 +23,22 @@ class History(TypedDict):
     content: str
 
 class ChatState(TypedDict):
-    question: str
-    company_id: uuid.UUID
-    user_id: uuid.UUID
-    session_id: uuid.UUID
-    conversation_history: list[History]
+    company_id: str
+    user_id: str
+    session_id: str
 
-    accessible_document_ids: list[uuid.UUID]
-    query_embedding: list[float]
-    retrieved_chunks: list[RetrievedChunk]    
+    question: str
+
+    messages: Annotated[list, add_messages]
+
+    accessible_document_ids: list
+    query_embedding: list
+    retrieved_chunks: list
+
+    conversation_history: list
+
     answer: str
-    sources: list[Source]
+    sources: list
+
+    web_context: str
     
