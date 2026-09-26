@@ -34,6 +34,16 @@ def build_chart_graph(db: AsyncSession):
     )
 
     graph.add_node(
+        "retrieve_lexical",
+        nodes["retrieve_lexical"]
+    )
+
+    graph.add_node(
+        "fuse_results",
+        nodes["fuse_results"]
+    )
+
+    graph.add_node(
         "generate_answer",
         nodes["generate_answer"]
     )
@@ -48,8 +58,12 @@ def build_chart_graph(db: AsyncSession):
     graph.add_edge("resolve_permissions", "embed_question")
     graph.add_edge("embed_question", "retrieve_chunks")
 
+    graph.add_edge("embed_question", "retrieve_lexical")
+    graph.add_edge("retrieve_chunks", "fuse_results")
+    graph.add_edge("retrieve_lexical", "fuse_results")
+
     graph.add_edge(
-        "retrieve_chunks",
+        "fuse_results",
         "generate_answer"
     )
 

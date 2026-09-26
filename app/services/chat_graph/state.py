@@ -12,6 +12,12 @@ class RetrievedChunk(TypedDict):
     document_id: uuid.UUID
     score: float
 
+class LexicalChunk(TypedDict):
+    content: str
+    document_id: uuid.UUID
+    chunk_id: uuid.UUID
+    rank: float
+
 class Source(TypedDict):
     document_id: str
     chunk_id: str
@@ -33,7 +39,9 @@ class ChatState(TypedDict):
     accessible_document_ids: list[uuid.UUID]
     query_embedding: list[float]
     retrieved_chunks: list[RetrievedChunk]
-
+    lexical_chunks: list[LexicalChunk]
+    fused_chunks: list[dict]
+    
     conversation_history: list[History]
 
     answer: str
