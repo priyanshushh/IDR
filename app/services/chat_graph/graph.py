@@ -44,6 +44,11 @@ def build_chart_graph(db: AsyncSession):
     )
 
     graph.add_node(
+        "rerank_chunks",
+        nodes["rerank_chunks"]
+    )
+
+    graph.add_node(
         "generate_answer",
         nodes["generate_answer"]
     )
@@ -56,16 +61,13 @@ def build_chart_graph(db: AsyncSession):
     graph.add_edge(START, "load_history")
     graph.add_edge("load_history", "resolve_permissions")
     graph.add_edge("resolve_permissions", "embed_question")
+    
     graph.add_edge("embed_question", "retrieve_chunks")
-
     graph.add_edge("embed_question", "retrieve_lexical")
     graph.add_edge("retrieve_chunks", "fuse_results")
     graph.add_edge("retrieve_lexical", "fuse_results")
-
-    graph.add_edge(
-        "fuse_results",
-        "generate_answer"
-    )
+    graph.add_edge("fuse_results", "rerank_chunks")
+    graph.add_edge("rerank_chunks", "generate_answer")
 
     graph.add_conditional_edges(
         "generate_answer",

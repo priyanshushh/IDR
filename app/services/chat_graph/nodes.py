@@ -12,7 +12,7 @@ from app.models.chat import ChatMessage
 from app.services.prompts.system_prompt import SYSTEM_PROMPT
 from langchain_community.tools import DuckDuckGoSearchResults
 from langchain_core.messages import SystemMessage
-
+from app.services.reranker import rerank
 SIMILARITY_THRESHOLD = 0.8
 TOP_K = 8
 HISTORY_LIMIT = 10
@@ -145,18 +145,24 @@ def make_nodes(db: AsyncSession):
                 {"role": row.role, "content": row.content} for row in rows
             ]
         }
-    
+
+    async def rerank_chunks(state: ChatState) -> dict:
+        if not state["fused_chunks"]:
+            return {"retrieved_chunks": []}
+        reranked = await asyncio.to_thread(rerank, state["question"], state["fused_chunks"])
+        return {"retrieved_chunks": reranked[:TOP_K]}
+
+
     async def generate_answer(state: ChatState) -> dict:
         context = "\n\n".join(
             f"[{i + 1}] {c['content']}"
-            for i, c in enumerate(state["fused_chunks"])
+            for i, c in enumerate(state["retrieved_chunks"])
         )
 
         history_text = "\n".join(
             f"{turn['role']}: {turn['content']}"
             for turn in state["conversation_history"]
         )
-
         prompt = SYSTEM_PROMPT.format(
             history_text=history_text,
             context=context,
@@ -182,12 +188,9 @@ def make_nodes(db: AsyncSession):
                 {
                     "document_id": str(c["document_id"]),
                     "chunk_id": str(c["chunk_id"]),
-                    # dense chunks carry "score" (cosine distance), lexical-only
-                    # chunks carry "rank" instead - fall back to
-                    # whichever this chunk actually has.
-                    "score": c.get("score", c.get("rank")),
+                    "score": c.get("rerank_score"),
                 }
-                for c in state["fused_chunks"]
+                for c in state["retrieved_chunks"]
             ]
         return result
 
@@ -199,5 +202,6 @@ def make_nodes(db: AsyncSession):
         "load_history": load_history,
         "retrieve_lexical": retrieve_lexical,
         "fuse_results": fuse_results,
+        "rerank_chunks": rerank_chunks,
         "generate_answer": generate_answer,
     }
