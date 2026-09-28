@@ -124,7 +124,17 @@ def make_nodes(db: AsyncSession):
                 items[item_id] = item
 
         fused_ids = sorted(scores, key=lambda i: scores[i], reverse=True)
-        return [items[i] for i in fused_ids]
+
+        # Stamp the fused score onto each item (same in-place-mutation pattern
+        # rerank() already uses for rerank_score) so debug/eval tooling
+        # (app/services/chat_graph/debug.py) can report it without having to
+        # recompute RRF itself.
+        fused = []
+        for item_id in fused_ids:
+            item = items[item_id]
+            item["rrf_score"] = scores[item_id]
+            fused.append(item)
+        return fused
 
 
     async def fuse_results(state: ChatState) -> dict:

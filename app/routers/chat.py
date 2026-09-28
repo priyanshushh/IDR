@@ -4,7 +4,14 @@ from app.core.security import CurrentUser
 from app.core.tenant_db import get_tenant_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends
-from app.schemas.chat import ChatQueryRequest, ChatQueryResponse, ChatSessionResponse , ChatMessageResponse
+from app.schemas.chat import (
+    ChatQueryRequest,
+    ChatQueryResponse,
+    ChatSessionResponse,
+    ChatMessageResponse,
+    RetrievalDebugRequest,
+    RetrievalDebugResponse,
+)
 
 router = APIRouter()
 
@@ -27,6 +34,26 @@ async def query_endpoint(
         company_id=current_user.company_id,
         user_id=current_user.id,
     )
+
+@router.post("/retrieval-debug", response_model=RetrievalDebugResponse)
+async def retrieval_debug_endpoint(
+    request: RetrievalDebugRequest,
+    current_user: CurrentUser,
+    service: ChatService = Depends(get_chat_service),
+):
+    """Owner/Admin-only, dev-time endpoint: run retrieval + fusion + rerank for
+    a single question with no LLM call, and return the ranked chunks from
+    every stage (vector-only, lexical-only, fused, reranked). Useful for
+    tuning chunking/ranking without paying for a generation call each time —
+    see build_docs/06-evaluation-guide.md §2 and §9.3.
+    """
+    return await service.retrieval_debug(
+        question=request.question,
+        company_id=current_user.company_id,
+        user_id=current_user.id,
+        role=current_user.role,
+    )
+
 
 @router.get("/sessions", response_model=list[ChatSessionResponse])
 async def list_sessions(
