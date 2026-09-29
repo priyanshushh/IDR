@@ -1,7 +1,7 @@
+"""Retrieval-only evaluation harness — see build_docs/06-evaluation-guide.md.
 
-
-"""Retrieval-only evaluation harness 
-
+No LLM call anywhere in this path. For the generation-side half (spends real
+tokens), see evals/run_generation.py.
 
 Usage:
     python -m evals.run --company-slug solstice-robotics --user-email owner@solstice.example
@@ -12,20 +12,11 @@ import argparse
 import asyncio
 import json
 from collections import defaultdict
-from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import event, select
-from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session as SyncSession
-
-from app.database.database import AsyncSessionLocal, TENANT_SCHEMA
-from app.models.company import Company, CompanyMember
-from app.models.documents import Document
-from app.models.user import User
 from app.services.chat_graph.debug import run_retrieval_debug
+from evals._common import load_company, load_filename_map, load_user_and_role, tenant_session
 from evals.metrics import (
     dedupe_preserve_order,
     mean,
@@ -40,63 +31,6 @@ DEFAULT_DATASET = REPO_ROOT / "build_docs" / "golden-dataset" / "golden_question
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "evals" / "results"
 
 STAGES = ["vector_only", "lexical_only", "fused", "reranked"]
-
-
-@asynccontextmanager
-async def _tenant_session(schema_name: str):
-    """Same schema_translate_map pattern as app/core/tenant_db.py, without the
-    FastAPI Depends(CurrentUser) plumbing this CLI script doesn't have.
-    """
-    async with AsyncSessionLocal() as session:
-        schema_translate_map = {TENANT_SCHEMA: schema_name}
-
-        @event.listens_for(session.sync_session, "after_begin")
-        def _apply_schema_translate_map(
-            sync_session: SyncSession, transaction, connection: Connection
-        ) -> None:
-            connection.execution_options(schema_translate_map=schema_translate_map)
-
-        yield session
-
-
-async def _load_company(slug: str) -> Company:
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(Company).where(Company.slug == slug))
-        company = result.scalar_one_or_none()
-
-    if company is None:
-        raise SystemExit(
-            f"No company found with slug={slug!r}. Sign up the test company through "
-            "the app first (see build_docs/golden-dataset/README.md)."
-        )
-    if not company.schema_name:
-        raise SystemExit(f"Company {slug!r} has no schema_name provisioned yet.")
-    return company
-
-
-async def _load_user_and_role(email: str, company_id) -> tuple[User, str]:
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(User, CompanyMember.role)
-            .join(CompanyMember, CompanyMember.user_id == User.id)
-            .where(User.email == email, CompanyMember.company_id == company_id)
-        )
-        row = result.first()
-
-    if row is None:
-        raise SystemExit(
-            f"No user with email={email!r} belonging to this company was found."
-        )
-    return row[0], row[1]
-
-
-async def _load_filename_map(db: AsyncSession, company_id) -> dict[str, str]:
-    result = await db.execute(
-        select(Document.original_filename, Document.id).where(
-            Document.company_id == company_id
-        )
-    )
-    return {filename: str(doc_id) for filename, doc_id in result.all()}
 
 
 def _relevant_ids_for(question: dict, filename_map: dict[str, str]) -> tuple[set[str], list[str]]:
@@ -176,8 +110,8 @@ async def run_eval(
     category_filter: str | None,
     limit: int | None,
 ) -> None:
-    company = await _load_company(company_slug)
-    user, role = await _load_user_and_role(user_email, company.id)
+    company = await load_company(company_slug)
+    user, role = await load_user_and_role(user_email, company.id)
 
     dataset = json.loads(dataset_path.read_text(encoding="utf-8"))
     questions = dataset["questions"]
@@ -196,8 +130,8 @@ async def run_eval(
     per_question_records: list[dict] = []
     missing_filenames: set[str] = set()
 
-    async with _tenant_session(company.schema_name) as db:
-        filename_map = await _load_filename_map(db, company.id)
+    async with tenant_session(company.schema_name) as db:
+        filename_map = await load_filename_map(db, company.id)
         print(f"Documents found in tenant: {len(filename_map)} ({', '.join(filename_map) or 'none'})")
 
         for question in questions:
