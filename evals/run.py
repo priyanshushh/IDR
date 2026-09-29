@@ -1,5 +1,13 @@
 
 
+"""Retrieval-only evaluation harness 
+
+
+Usage:
+    python -m evals.run --company-slug solstice-robotics --user-email owner@solstice.example
+    python -m evals.run --company-slug solstice-robotics --user-email owner@solstice.example --category multi_hop
+    python -m evals.run --company-slug solstice-robotics --user-email owner@solstice.example --limit 10
+"""
 import argparse
 import asyncio
 import json
@@ -317,12 +325,3 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-
-"""Retrieval-only evaluation harness 
-
-
-Usage:
-    python -m evals.run --company-slug solstice-robotics --user-email owner@solstice.example
-    python -m evals.run --company-slug solstice-robotics --user-email owner@solstice.example --category multi_hop
-    python -m evals.run --company-slug solstice-robotics --user-email owner@solstice.example --limit 10
-"""

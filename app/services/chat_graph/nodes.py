@@ -13,7 +13,7 @@ from app.services.prompts.system_prompt import SYSTEM_PROMPT
 from langchain_community.tools import DuckDuckGoSearchResults
 from langchain_core.messages import SystemMessage
 from app.services.reranker import rerank
-SIMILARITY_THRESHOLD = 0.8
+SIMILARITY_THRESHOLD = 0.6
 TOP_K = 8
 HISTORY_LIMIT = 10
 RRF_K = 60 
