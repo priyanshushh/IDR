@@ -16,6 +16,27 @@ class ChatQueryResponse(BaseModel):
     answer: str
     sources: list[dict]
 
+
+class RetrievalDebugRequest(BaseModel):
+    question: str
+
+
+class RetrievalDebugChunk(BaseModel):
+    chunk_id: str
+    document_id: str
+    content: str
+    score: float | None
+    score_type: str
+
+
+class RetrievalDebugResponse(BaseModel):
+    question: str
+    accessible_document_count: int
+    vector_only: list[RetrievalDebugChunk]
+    lexical_only: list[RetrievalDebugChunk]
+    fused: list[RetrievalDebugChunk]
+    reranked: list[RetrievalDebugChunk]
+
 class ChatSessionResponse(BaseModel):
     id: uuid.UUID
     title:str

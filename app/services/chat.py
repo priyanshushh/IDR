@@ -4,6 +4,7 @@ from app.core.tenant_db import AsyncSession
 from app.schemas.chat import ChatQueryResponse,MessageRole,ChatSessionResponse,ChatMessageResponse
 from app.services.chat_graph.graph import build_chart_graph
 from app.services.chat_graph.state import ChatState
+from app.services.chat_graph.debug import run_retrieval_debug
 from app.models.chat import ChatMessage, ChatSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -200,6 +201,37 @@ class ChatService:
             sources=sources,
         )
 
+
+    async def retrieval_debug(
+        self,
+        question: str,
+        company_id: uuid.UUID,
+        user_id: uuid.UUID,
+        role: str,
+    ) -> dict:
+        if role not in ("owner", "admin"):
+            raise HTTPException(
+                status_code=403,
+                detail="Retrieval debug is restricted to owner/admin accounts.",
+            )
+
+        if not question or not question.strip():
+            raise HTTPException(status_code=400, detail="Question cannot be empty.")
+
+        try:
+            return await run_retrieval_debug(
+                self.db, company_id, user_id, question.strip()
+            )
+        except Exception:
+            logger.exception(
+                "Retrieval debug failed. company_id=%s user_id=%s",
+                company_id,
+                user_id,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to run retrieval debug.",
+            )
 
     async def list_sessions(self, company_id: uuid.UUID, user_id: uuid.UUID) -> list[ChatSessionResponse]:
         try:
