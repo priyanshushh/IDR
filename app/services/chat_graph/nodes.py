@@ -43,7 +43,16 @@ def make_nodes(db: AsyncSession):
     """Nodes close over the request's tenant-scoped `db` session (same pattern as
     DocumentService/ChatService — one session per request, not a global)."""
 
-    llm = ChatGoogleGenerativeAI(model="gemini-flash-latest")
+    # "gemini-flash-latest" (-> gemini-3.8-flash) hit a real 20-req/day cap
+    # while building evals/run_generation.py, and gemini-2.5-flash — despite
+    # being listed by client.models.list() for this key — 404s as "no longer
+    # available to new users" (a known Gemini API inconsistency: the list
+    # endpoint doesn't reflect per-key callability). gemini-flash-lite-latest
+    # is confirmed listed AND on a separate, more generous free-tier quota
+    # bucket than the full "flash" tier. Re-verify with
+    # `client.models.list()` (google.genai) before changing this again —
+    # don't guess a name from memory, this catalog churns fast.
+    llm = ChatGoogleGenerativeAI(model="gemini-flash-lite-latest")
     web_search_tool = DuckDuckGoSearchResults(num_results=3, max_results=3)
     tools = [web_search_tool]
     llm_with_tools = llm.bind_tools(tools)

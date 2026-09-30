@@ -33,7 +33,7 @@ DEFAULT_DATASET = REPO_ROOT / "build_docs" / "golden-dataset" / "golden_question
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "evals" / "results"
 
 
-MIN_SECONDS_BETWEEN_CALLS = 13.0
+MIN_SECONDS_BETWEEN_CALLS = 7.0
 RETRY_ATTEMPTS = 3
 RETRY_DELAY_SECONDS = 65.0
 

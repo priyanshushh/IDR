@@ -12,7 +12,7 @@ beats a vibe.
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
-JUDGE_MODEL = "gemini-flash-latest"
+JUDGE_MODEL = "gemini-3.1-flash-lite"
 
 
 class JudgeResult(BaseModel):
