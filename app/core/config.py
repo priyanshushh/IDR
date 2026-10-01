@@ -20,7 +20,11 @@ class Settings(BaseSettings):
     debug: bool = True
     refresh_token_expire_days: int = 30
 
-
+    
+    langsmith_tracing:bool
+    langsmith_endpoint:str 
+    langsmith_api_key:str 
+    langsmith_project:str 
     # Future RAG settings
     # embedding_model: str = "default"
     # llm_model: str = "default"
