@@ -15,6 +15,7 @@ class ChatQueryRequest(BaseModel):
 class ChatQueryResponse(BaseModel):
     answer: str
     sources: list[dict]
+    usage: dict | None = None
 
 
 class RetrievalDebugRequest(BaseModel):
