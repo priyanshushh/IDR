@@ -28,6 +28,7 @@ class ChatService:
         company_id: uuid.UUID,
         user_id: uuid.UUID,
         session_id: uuid.UUID,
+        role: str,
     ) -> ChatQueryResponse:
         if not question or not question.strip():
             raise HTTPException(
@@ -162,6 +163,7 @@ class ChatService:
                             HumanMessage(content=question)
                         ],
                         session_id=session_id,
+                        role=role,
                         conversation_history= [],
                         retrieved_chunks= [],
                         accessible_document_ids= [],
@@ -257,7 +259,7 @@ class ChatService:
 
         try:
             return await run_retrieval_debug(
-                self.db, company_id, user_id, question.strip()
+                self.db, company_id, user_id, question.strip(), role
             )
         except Exception:
             logger.exception(

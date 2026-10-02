@@ -73,7 +73,7 @@ def make_nodes(db: AsyncSession):
 
     async def resolve_permissions(state: ChatState) -> dict:
         ids = await resolve_accessible_document_ids(
-            db, state["company_id"], state["user_id"]
+            db, state["company_id"], state["user_id"], state["role"]
         )
         return {"accessible_document_ids": ids}
 

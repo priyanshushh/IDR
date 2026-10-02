@@ -1,12 +1,22 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.database.dependencies import get_db
 from fastapi import Depends
 from app.routers import company , auth, employee, documents, groups, chat
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(company.router, prefix="/api/company", tags=["Company"])

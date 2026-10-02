@@ -31,6 +31,7 @@ class ChatState(TypedDict):
     company_id: uuid.UUID
     user_id: uuid.UUID
     session_id: uuid.UUID
+    role: str
 
     question: str
 

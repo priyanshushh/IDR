@@ -18,9 +18,10 @@ async def run_retrieval_debug(
     company_id: uuid.UUID,
     user_id: uuid.UUID,
     question: str,
+    role: str,
 ) -> dict:
     nodes = make_nodes(db)
-    state: dict = {"company_id": company_id, "user_id": user_id, "question": question}
+    state: dict = {"company_id": company_id, "user_id": user_id, "question": question, "role": role}
 
     state.update(await nodes["resolve_permissions"](state))
     state.update(await nodes["embed_question"](state))
