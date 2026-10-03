@@ -22,12 +22,12 @@ class Settings(BaseSettings):
 
     
     langsmith_tracing:bool
-    langsmith_endpoint:str 
-    langsmith_api_key:str 
-    langsmith_project:str 
-    # Future RAG settings
-    # embedding_model: str = "default"
-    # llm_model: str = "default"
+    langsmith_endpoint:str
+    langsmith_api_key:str
+    langsmith_project:str
+
+
+    cors_origins: list[str] = ["http://localhost:5173"]
 
     model_config = SettingsConfigDict(
         env_file=".env",

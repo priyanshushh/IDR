@@ -100,7 +100,7 @@ class EmployeeService:
     async def get_employees(self,currentuser):
         try:
             result=await self.db.execute(
-                select(CompanyMember)
+                select(CompanyMember, User.name)
                 .join(
                     User,
                     CompanyMember.user_id == User.id
@@ -109,7 +109,15 @@ class EmployeeService:
                     CompanyMember.company_id == currentuser.company_id
                 )
             )
-            return result.scalars().all()
+            employees = []
+            for company_member, name in result.all():
+                employee = {
+                    column.name: getattr(company_member, column.name)
+                    for column in CompanyMember.__table__.columns
+                }
+                employee["name"] = name
+                employees.append(employee)
+            return employees
         except Exception as e:
             raise HTTPException(
                 status_code=400,
@@ -258,13 +266,13 @@ class EmployeeService:
                 status_code=404,
                 detail="Employee not found"
             )
-        is_admin_or_owner = currentuser.role.lower() in ["owner", "admin"]
-        is_self = id == currentuser.id
-        if not is_admin_or_owner and not is_self:
-            raise HTTPException(
-                status_code=403,
-                detail="Forbidden"
-            )
+        # is_admin_or_owner = currentuser.role.lower() in ["owner", "admin"]
+        # is_self = id == currentuser.id
+        # if not is_admin_or_owner and not is_self:
+        #     raise HTTPException(
+        #         status_code=403,
+        #         detail="Forbidden"
+        #     )
 
         if payload.old_password==payload.new_password:
             raise HTTPException(

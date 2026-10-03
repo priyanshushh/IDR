@@ -31,6 +31,7 @@ class ChatState(TypedDict):
     company_id: uuid.UUID
     user_id: uuid.UUID
     session_id: uuid.UUID
+    role: str
 
     question: str
 
@@ -46,3 +47,12 @@ class ChatState(TypedDict):
 
     answer: str
     sources: list[Source]
+
+    # Guardrail: caps the generate_answer <-> tools round-trip (see MAX_TOOL_CALLS
+    # in nodes.py) so a model that keeps requesting searches can't loop past
+    # LangGraph's recursion_limit into a raw GraphRecursionError.
+    tool_call_count: int
+
+    # Accumulated across every LLM call this request made (the tool-calling loop
+    # can call the model more than once) — input_tokens/output_tokens/total_tokens.
+    usage: dict

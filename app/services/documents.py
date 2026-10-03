@@ -101,8 +101,8 @@ class DocumentService:
 
             raise
 
-    async def list_documents(self, company_id, user_id):
-        accessible = await resolve_accessible_document_ids(self.db, company_id, user_id)
+    async def list_documents(self, company_id, user_id, role):
+        accessible = await resolve_accessible_document_ids(self.db, company_id, user_id, role)
         stmt = (
             select(Document)
             .where(Document.company_id == company_id)
@@ -114,8 +114,8 @@ class DocumentService:
 
         return result.scalars().all()
 
-    async def get_document(self, company_id, document_id, user_id):
-        accessible = await resolve_accessible_document_ids(self.db,company_id, user_id)
+    async def get_document(self, company_id, document_id, user_id, role):
+        accessible = await resolve_accessible_document_ids(self.db, company_id, user_id, role)
         stmt = (
             select(Document)
             .where(Document.company_id == company_id)

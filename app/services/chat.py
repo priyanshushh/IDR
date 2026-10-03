@@ -5,13 +5,17 @@ from app.schemas.chat import ChatQueryResponse,MessageRole,ChatSessionResponse,C
 from app.services.chat_graph.graph import build_chart_graph
 from app.services.chat_graph.state import ChatState
 from app.services.chat_graph.debug import run_retrieval_debug
+from app.core.rate_limit import check_rate_limit
 from app.models.chat import ChatMessage, ChatSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from langchain_core.messages import HumanMessage
-import logging 
+from langsmith.run_helpers import tracing_context
+import logging
 
 logger = logging.getLogger(__name__)
+
+MAX_QUESTION_LENGTH = 2000
 
 
 class ChatService:
@@ -24,12 +28,21 @@ class ChatService:
         company_id: uuid.UUID,
         user_id: uuid.UUID,
         session_id: uuid.UUID,
+        role: str,
     ) -> ChatQueryResponse:
         if not question or not question.strip():
             raise HTTPException(
                 status_code=400,
                 detail="Question cannot be empty.",
             )
+
+        if len(question) > MAX_QUESTION_LENGTH:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Question is too long (max {MAX_QUESTION_LENGTH} characters).",
+            )
+
+        check_rate_limit(str(user_id))
 
         # try:
         result = await self.db.execute(
@@ -129,20 +142,36 @@ class ChatService:
             )
 
         try:
-            final_state = await graph.ainvoke(
-                ChatState(
-                    question=question.strip(),
-                    company_id=company_id,
-                    user_id=user_id,
-                    messages=[
-                        HumanMessage(content=question)
-                    ],
-                    session_id=session_id,
-                    conversation_history= [],
-                    retrieved_chunks= [],
-                    accessible_document_ids= [],
+            # Named + tagged with tenant/session metadata so this request's trace is
+            # findable in the LangSmith project by session_id/company_id/user_id,
+            # rather than one of many identically-named, anonymous "LangGraph" runs —
+            # see build_docs/08-observability-and-guardrails.md §1.3.
+            with tracing_context(
+                metadata={
+                    "company_id": str(company_id),
+                    "user_id": str(user_id),
+                    "session_id": str(session_id),
+                },
+                tags=["chat.query"],
+            ):
+                final_state = await graph.ainvoke(
+                    ChatState(
+                        question=question.strip(),
+                        company_id=company_id,
+                        user_id=user_id,
+                        messages=[
+                            HumanMessage(content=question)
+                        ],
+                        session_id=session_id,
+                        role=role,
+                        conversation_history= [],
+                        retrieved_chunks= [],
+                        accessible_document_ids= [],
+                        tool_call_count=0,
+                        usage={},
+                    ),
+                    config={"run_name": "chat.query"},
                 )
-            )
 
         except Exception:
             logger.exception(
@@ -157,6 +186,15 @@ class ChatService:
 
         answer = final_state.get("answer")
         sources = final_state.get("sources", [])
+        usage = final_state.get("usage") or {}
+
+        logger.info(
+            "Chat query token usage: session_id=%s input=%s output=%s total=%s",
+            session_id,
+            usage.get("input_tokens"),
+            usage.get("output_tokens"),
+            usage.get("total_tokens"),
+        )
 
         if not answer:
             logger.error(
@@ -199,6 +237,7 @@ class ChatService:
         return ChatQueryResponse(
             answer=answer,
             sources=sources,
+            usage=usage,
         )
 
 
@@ -220,7 +259,7 @@ class ChatService:
 
         try:
             return await run_retrieval_debug(
-                self.db, company_id, user_id, question.strip()
+                self.db, company_id, user_id, question.strip(), role
             )
         except Exception:
             logger.exception(

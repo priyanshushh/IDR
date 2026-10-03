@@ -33,6 +33,7 @@ async def query_endpoint(
         question=request.query,
         company_id=current_user.company_id,
         user_id=current_user.id,
+        role=current_user.role,
     )
 
 @router.post("/retrieval-debug", response_model=RetrievalDebugResponse)

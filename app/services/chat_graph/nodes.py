@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from sqlalchemy import select, func, desc, Text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,11 +13,24 @@ from app.models.chat import ChatMessage
 from app.services.prompts.system_prompt import SYSTEM_PROMPT
 from langchain_community.tools import DuckDuckGoSearchResults
 from langchain_core.messages import SystemMessage
+from langchain_core.runnables import RunnableConfig
 from app.services.reranker import rerank
+from app.services.guardrails import scan_for_injection
+
+logger = logging.getLogger(__name__)
+
 SIMILARITY_THRESHOLD = 0.6
 TOP_K = 8
 HISTORY_LIMIT = 10
-RRF_K = 60 
+RRF_K = 60
+
+# Guardrail (build_docs/08-observability-and-guardrails.md §2.4): without this,
+# generate_answer <-> tools has no cap of its own and relies entirely on LangGraph's
+# default recursion_limit — if ever hit, that surfaces as a raw GraphRecursionError
+# instead of a usable answer.
+MAX_TOOL_CALLS = 3
+
+HEDGE_PHRASES = ("don't have information", "not available", "couldn't find", "no information")
 
 def extract_text(content) -> str:
     """Normalize LangChain/Gemini message content to plain text."""
@@ -59,7 +73,7 @@ def make_nodes(db: AsyncSession):
 
     async def resolve_permissions(state: ChatState) -> dict:
         ids = await resolve_accessible_document_ids(
-            db, state["company_id"], state["user_id"]
+            db, state["company_id"], state["user_id"], state["role"]
         )
         return {"accessible_document_ids": ids}
 
@@ -93,6 +107,13 @@ def make_nodes(db: AsyncSession):
             for chunk, distance in result.all()
             if distance <= SIMILARITY_THRESHOLD
         ]
+        for c in chunks:
+            hits = scan_for_injection(c["content"])
+            if hits:
+                logger.warning(
+                    "possible prompt injection in chunk_id=%s patterns=%s",
+                    c["chunk_id"], hits,
+                )
         return {"retrieved_chunks": chunks}
 
     async def retrieve_lexical(state: ChatState) -> dict:
@@ -120,6 +141,13 @@ def make_nodes(db: AsyncSession):
             {"content": c.content, "document_id": c.document_id, "chunk_id": c.id, "rank": rank}
             for c, rank in result.all()
         ]
+        for c in chunks:
+            hits = scan_for_injection(c["content"])
+            if hits:
+                logger.warning(
+                    "possible prompt injection in chunk_id=%s patterns=%s",
+                    c["chunk_id"], hits,
+                )
         return {"lexical_chunks": chunks}
 
     def reciprocal_rank_fusion(*ranked_lists: list[dict], key="chunk_id") -> list[dict]:
@@ -172,7 +200,7 @@ def make_nodes(db: AsyncSession):
         return {"retrieved_chunks": reranked[:TOP_K]}
 
 
-    async def generate_answer(state: ChatState) -> dict:
+    async def generate_answer(state: ChatState, config: RunnableConfig) -> dict:
         context = "\n\n".join(
             f"[{i + 1}] {c['content']}"
             for i, c in enumerate(state["retrieved_chunks"])
@@ -192,14 +220,41 @@ def make_nodes(db: AsyncSession):
             SystemMessage(content=prompt),
             *state["messages"],
         ]
-        response = await llm_with_tools.ainvoke(messages)
+
+        # Guardrail: once the cap is hit, call the plain (tool-less) llm instead of
+        # llm_with_tools — the model can't request another tool call, so it's
+        # forced to answer with whatever it already has instead of looping further.
+        tool_call_count = state.get("tool_call_count", 0)
+        model = llm if tool_call_count >= MAX_TOOL_CALLS else llm_with_tools
+        response = await model.ainvoke(messages, config=config)
+
+        usage_metadata = response.usage_metadata or {}
+        usage = dict(state.get("usage") or {})
+        for key in ("input_tokens", "output_tokens", "total_tokens"):
+            usage[key] = usage.get(key, 0) + (usage_metadata.get(key) or 0)
 
         result = {
             "messages": [response],
+            "tool_call_count": tool_call_count + bool(response.tool_calls),
+            "usage": usage,
         }
 
         if not response.tool_calls:
             answer = extract_text(response.content)
+
+            if scan_for_injection(answer):
+                logger.warning(
+                    "model output matched injection patterns, session_id=%s",
+                    state["session_id"],
+                )
+
+            if not state["retrieved_chunks"] and not any(
+                p in answer.lower() for p in HEDGE_PHRASES
+            ):
+                logger.warning(
+                    "possible ungrounded answer with no context, session_id=%s",
+                    state["session_id"],
+                )
 
             result["answer"] = answer
 
